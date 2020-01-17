@@ -84,7 +84,7 @@ binary package manager like conda_.  You can skip this step if you already
 have these libraries, don't care to use them, or have sufficient build
 environment on your computer to compile them when installing with ``pip``::
 
-   conda install -y numpy pandas scipy bokeh
+   conda install -y numpy pandas scipy bokeh psutil
 
 .. _conda: https://conda.io/
 
@@ -95,7 +95,7 @@ Install Dask and dependencies::
 
 For development, Dask uses the following additional dependencies::
 
-   pip install pytest moto mock
+   pip install pytest moto
 
 
 Run Tests
@@ -152,7 +152,7 @@ You can also test certain modules or individual tests for faster response::
 
    py.test dask/dataframe --verbose
 
-   py.test dask/dataframe/tests/test_dataframe_core.py::test_set_index
+   py.test dask/dataframe/tests/test_dataframe.py::test_rename_index
 
 Tests run automatically on the Travis.ci and Appveyor continuous testing
 frameworks on every push to every pull request on GitHub.
@@ -161,6 +161,7 @@ Tests are organized within the various modules' subdirectories::
 
     dask/array/tests/test_*.py
     dask/bag/tests/test_*.py
+    dask/bytes/tests/test_*.py
     dask/dataframe/tests/test_*.py
     dask/diagnostics/tests/test_*.py
 
@@ -176,7 +177,7 @@ typically tested directly against the NumPy or Pandas libraries using the
 
    def test_aggregations():
        nx = np.random.random(100)
-       dx = da.from_array(x, chunks=(10,))
+       dx = da.from_array(nx, chunks=(10,))
 
        assert_eq(nx.sum(), dx.sum())
        assert_eq(nx.min(), dx.min())
@@ -228,7 +229,7 @@ after the line.
        ValueError(...)
        """
 
-.. _numpydoc: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt
+.. _numpydoc: https://numpydoc.readthedocs.io/en/latest/format.html#docstring-standard
 
 Docstrings are currently tested under Python 3.6 on Travis.ci.  You can test
 docstrings with pytest as follows::
@@ -240,13 +241,37 @@ Docstring testing requires ``graphviz`` to be installed. This can be done via::
    conda install -y graphviz
 
 
-Style
-~~~~~
+Code Formatting
+~~~~~~~~~~~~~~~
 
-Dask verifies style uniformity with the ``flake8`` tool::
+Dask uses `Black <https://black.readthedocs.io/en/stable/>`_ and
+`Flake8 <http://flake8.pycqa.org/en/latest/>`_ to ensure a consistent code
+format throughout the project. ``black`` and ``flake8`` can be installed with
+``pip``::
 
-   pip install flake8
+   pip install black flake8
+
+and then run from the root of the Dask repository::
+
+   black dask
    flake8 dask
+
+to auto-format your code. Additionally, many editors have plugins that will
+apply ``black`` as you edit files.
+
+Optionally, you may wish to setup `pre-commit hooks <https://pre-commit.com/>`_
+to automatically run ``black`` and ``flake8`` when you make a git commit. This
+can be done by installing ``pre-commit``::
+
+   pip install pre-commit
+
+and then running::
+
+   pre-commit install
+
+from the root of the Dask repository. Now ``black`` and ``flake8`` will be run
+each time you commit changes. You can skip these checks with
+``git commit --no-verify``.
 
 
 Contributing to Documentation

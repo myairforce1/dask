@@ -1,8 +1,8 @@
-from __future__ import absolute_import, division, print_function
-
-from itertools import chain
+from collections import defaultdict
 
 from .utils_test import add, inc  # noqa: F401
+
+no_default = "__no_default__"
 
 
 def ishashable(x):
@@ -139,7 +139,7 @@ def get(dsk, out, cache=None):
     >>> get(d, 'y')
     2
     """
-    for k in (flatten(out) if isinstance(out, list) else [out]):
+    for k in flatten(out) if isinstance(out, list) else [out]:
         if k not in dsk:
             raise KeyError("{0} is not a key in the graph".format(k))
     if cache is None:
@@ -154,7 +154,7 @@ def get(dsk, out, cache=None):
     return result
 
 
-def get_dependencies(dsk, key=None, task=None, as_list=False):
+def get_dependencies(dsk, key=None, task=no_default, as_list=False):
     """ Get the immediate tasks on which this task depends
 
     Examples
@@ -185,7 +185,7 @@ def get_dependencies(dsk, key=None, task=None, as_list=False):
     """
     if key is not None:
         arg = dsk[key]
-    elif task is not None:
+    elif task is not no_default:
         arg = task
     else:
         raise ValueError("Provide either key or task")
@@ -221,11 +221,10 @@ def get_deps(dsk):
     >>> dependencies, dependents = get_deps(dsk)
     >>> dependencies
     {'a': set(), 'b': {'a'}, 'c': {'b'}}
-    >>> dependents
+    >>> dependents  # doctest: +SKIP
     {'a': {'b'}, 'b': {'c'}, 'c': set()}
     """
-    dependencies = {k: get_dependencies(dsk, task=v)
-                    for k, v in dsk.items()}
+    dependencies = {k: get_dependencies(dsk, task=v) for k, v in dsk.items()}
     dependents = reverse_dict(dependencies)
     return dependencies, dependents
 
@@ -267,11 +266,13 @@ def reverse_dict(d):
     >>> reverse_dict(d)  # doctest: +SKIP
     {'a': set([]), 'b': set(['a']}, 'c': set(['a', 'b'])}
     """
-    terms = list(d.keys()) + list(chain.from_iterable(d.values()))
-    result = {t: set() for t in terms}
+    result = defaultdict(set)
+    _add = set.add
     for k, vals in d.items():
+        result[k]
         for val in vals:
-            result[val].add(k)
+            _add(result[val], k)
+    result.default_factory = None
     return result
 
 
@@ -306,8 +307,9 @@ def subs(task, key, val):
                 # Can't do a simple equality check, since this may trigger
                 # a FutureWarning from NumPy about array equality
                 # https://github.com/dask/dask/pull/2457
-                if len(arg) == len(key) and all(type(aa) == type(bb) and aa == bb
-                                                for aa, bb in zip(arg, key)):
+                if len(arg) == len(key) and all(
+                    type(aa) == type(bb) and aa == bb for aa, bb in zip(arg, key)
+                ):
                     arg = val
 
             except (TypeError, AttributeError):
@@ -369,8 +371,8 @@ def _toposort(dsk, keys=None, returncycle=False, dependencies=None):
                         if returncycle:
                             return cycle
                         else:
-                            cycle = '->'.join(str(x) for x in cycle)
-                            raise RuntimeError('Cycle detected in Dask: %s' % cycle)
+                            cycle = "->".join(str(x) for x in cycle)
+                            raise RuntimeError("Cycle detected in Dask: %s" % cycle)
                     next_nodes.append(nxt)
 
             if next_nodes:
@@ -436,13 +438,14 @@ def isdag(d, keys):
 
 class literal(object):
     """A small serializable object to wrap literal values without copying"""
-    __slots__ = ('data',)
+
+    __slots__ = ("data",)
 
     def __init__(self, data):
         self.data = data
 
     def __repr__(self):
-        return 'literal<type=%s>' % type(self.data).__name__
+        return "literal<type=%s>" % type(self.data).__name__
 
     def __reduce__(self):
         return (literal, (self.data,))

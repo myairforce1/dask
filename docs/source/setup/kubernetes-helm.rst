@@ -28,8 +28,8 @@ Microsoft.  We recommend the first part of the documentation in the guide
 that focuses on Kubernetes and Helm (you do not need to follow all of these
 instructions).  Also, JupyterHub is not necessary to deploy Dask:
 
-- `Creating a Kubernetes Cluster <https://zero-to-jupyterhub.readthedocs.io/en/v0.4-doc/create-k8s-cluster.html>`_
-- `Setting up Helm <https://zero-to-jupyterhub.readthedocs.io/en/v0.4-doc/setup-helm.html>`_
+- `Creating a Kubernetes Cluster <https://zero-to-jupyterhub.readthedocs.io/en/latest/create-k8s-cluster.html>`_
+- `Setting up Helm <https://zero-to-jupyterhub.readthedocs.io/en/latest/setup-helm.html>`_
 
 Alternatively, you may want to experiment with Kubernetes locally using
 `Minikube <https://kubernetes.io/docs/getting-started-guides/minikube/>`_.
@@ -38,16 +38,16 @@ Alternatively, you may want to experiment with Kubernetes locally using
 Helm Install Dask
 -----------------
 
-Dask maintains a Helm chart in the default stable channel at
-https://kubernetes-charts.storage.googleapis.com .
-This should be added to your helm installation by default.
-You can update the known channels to make sure you have up-to-date charts as follows::
+Dask maintains a Helm chart repository containing various charts for the Dask community
+https://helm.dask.org/ .
+You will need to add this to your known channels and update your local charts::
 
+   helm repo add dask https://helm.dask.org/
    helm repo update
 
 Now, you can launch Dask on your Kubernetes cluster using the Dask Helm_ chart::
 
-   helm install stable/dask
+   helm install dask/dask
 
 This deploys a ``dask-scheduler``, several ``dask-worker`` processes, and
 also an optional Jupyter server.
@@ -83,7 +83,7 @@ Jupyter and Dask systems.
 Notice the name ``bald-eel``.  This is the name that Helm has given to your
 particular deployment of Dask.  You could, for example, have multiple
 Dask-and-Jupyter clusters running at once, and each would be given a different
-name.  Note that you will need to use this name to refer to your deployment in the future.  
+name.  Note that you will need to use this name to refer to your deployment in the future.
 Additionally, you can list all active helm deployments with::
 
    helm list
@@ -131,8 +131,8 @@ variable automatically.
 Configure Environment
 ---------------------
 
-By default, the Helm deployment launches three workers using two cores each and
-a standard conda environment.  We can customize this environment by creating a
+By default, the Helm deployment launches three workers using one core each and
+a standard conda environment. We can customize this environment by creating a
 small yaml file that implements a subset of the values in the
 `dask helm chart values.yaml file <https://github.com/dask/helm-chart/blob/master/dask/values.yaml>`_.
 
@@ -177,7 +177,7 @@ use helm install* for this stage: that would create a *new* deployment on the
 same Kubernetes cluster.  Instead, you will upgrade your existing deployment by
 using the current name::
 
-    helm upgrade bald-eel stable/dask -f config.yaml
+    helm upgrade bald-eel dask/dask -f config.yaml
 
 This will update those containers that need to be updated.  It may take a minute or so.
 

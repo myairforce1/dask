@@ -4,6 +4,7 @@ dist: trusty
 os: linux
 
 _base_envs:
+  - &test TEST='true'
   - &test_and_lint TEST='true' LINT='true'
   - &coverage COVERAGE='true' PARALLEL='false'
   - &no_coverage COVERAGE='false' PARALLEL='true'
@@ -16,38 +17,35 @@ _base_envs:
 jobs:
   fast_finish: true
   include:
-    - env:
-      - PYTHON=3.5
-      - NUMPY=1.13.0
-      - PANDAS=0.21.1
+    - env: &py36_env
+      - PYTHON_VERSION=3.6
+      - ENV_FILE=continuous_integration/travis/travis-36.yaml
       - *test_and_lint
       - *no_coverage
-      - *no_optimize
-      - *no_imports
-
-    - env: &py36_env
-      - PYTHON=3.6
-      - NUMPY=1.15.1
-      - PANDAS=0.23.4
-      - *test_and_lint
-      - *coverage
       - *no_optimize
       - *imports
 
     - env: &py37_env
-      - PYTHON=3.7
-      - NUMPY=1.16.2
-      - PANDAS>=0.24.1
+      - PYTHON_VERSION=3.7
+      - ENV_FILE=continuous_integration/travis/travis-37.yaml
       - *test_and_lint
       - *no_coverage
       - *no_optimize
       - *imports
       - *array_function
 
-    - env: &py37_dev
+    - env: &py38_env
+      - PYTHON_VERSION=3.8
+      - ENV_FILE=continuous_integration/travis/travis-38.yaml
+      - *test_and_lint
+      - *coverage
+      - *no_optimize
+      - *imports
+      - *array_function
+
+    - env: &py38_dev
       - UPSTREAM_DEV=1  # Install nightly versions of NumPy, pandas, pyarrow
-      - NUMPY=1.16.2    # these are overridden later
-      - PANDAS>=0.24.2
+      - ENV_FILE=continuous_integration/travis/travis-38-dev.yaml
       - *test_and_lint
       - *no_coverage
       - *no_optimize
@@ -60,6 +58,22 @@ jobs:
       os: osx
 
     - env:
+      - ENV_FILE=continuous_integration/travis/travis-mindeps-array-dataframe.yaml
+      - *test
+      - *no_coverage
+      - *no_optimize
+      - *no_imports
+      if: type != pull_request OR commit_message =~ test-mindeps  # Skip on PRS unless the commit message contains "test-mindeps"
+
+    - env:
+      - ENV_FILE=continuous_integration/travis/travis-mindeps-bag-delayed.yaml
+      - *test
+      - *no_coverage
+      - *no_optimize
+      - *no_imports
+      if: type != pull_request OR commit_message =~ test-mindeps  # Skip on PRS unless the commit message contains "test-mindeps"
+
+    - env:
       - TEST_HDFS='true'
       if: type != pull_request OR commit_message =~ test-hdfs  # Skip on PRS unless the commit message contains "test-hdfs"
       sudo: true
@@ -69,7 +83,7 @@ jobs:
         - source continuous_integration/hdfs/startup_hdfs.sh
 
   allow_failures:
-    - env: *py37_dev
+    - env: *py38_dev
     - os: osx
 
 
@@ -80,8 +94,9 @@ install:
 script:
   - if [[ $TEST_HDFS == 'true' ]]; then source continuous_integration/hdfs/run_tests.sh; fi
   - if [[ $TEST == 'true' ]]; then source continuous_integration/travis/run_tests.sh; fi
-  - if [[ $LINT == 'true' ]]; then flake8 dask; fi
-  - if [[ $TEST_IMPORTS == 'true' ]]; then source continuous_integration/travis/test_imports.sh; fi
+  - if [[ $LINT == 'true' ]]; then pip install flake8 ; flake8 dask; fi
+  - if [[ $LINT == 'true' ]]; then pip install git+https://github.com/psf/black@73bd7038fbefdb1c6a61fa1edf16ff61613050a5; black dask --check; fi
+  - if [[ $TEST_IMPORTS == 'true' ]]; then bash continuous_integration/travis/test_imports.sh; fi
 
 after_success:
   - codecov

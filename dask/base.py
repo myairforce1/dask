@@ -1,6 +1,5 @@
-from __future__ import absolute_import, division, print_function
-
 from collections import OrderedDict
+from collections.abc import Mapping, Iterator
 from functools import partial
 from hashlib import md5
 from operator import getitem
@@ -13,19 +12,24 @@ import uuid
 from toolz import merge, groupby, curry, identity
 from toolz.functoolz import Compose
 
-from .compatibility import (apply, long, unicode, Iterator, is_dataclass,
-                            dataclass_fields, Mapping, cPickle)
+from .compatibility import is_dataclass, dataclass_fields
 from .context import thread_state
 from .core import flatten, quote, get as simple_get
 from .hashing import hash_buffer_hex
-from .utils import Dispatch, ensure_dict
+from .utils import Dispatch, ensure_dict, apply
 from . import config, local, threaded
 
 
-__all__ = ("DaskMethodsMixin",
-           "is_dask_collection",
-           "compute", "persist", "optimize", "visualize",
-           "tokenize", "normalize_token")
+__all__ = (
+    "DaskMethodsMixin",
+    "is_dask_collection",
+    "compute",
+    "persist",
+    "optimize",
+    "visualize",
+    "tokenize",
+    "normalize_token",
+)
 
 
 def is_dask_collection(x):
@@ -38,10 +42,10 @@ def is_dask_collection(x):
 
 class DaskMethodsMixin(object):
     """A mixin adding standard dask collection methods"""
+
     __slots__ = ()
 
-    def visualize(self, filename='mydask', format=None, optimize_graph=False,
-                  **kwargs):
+    def visualize(self, filename="mydask", format=None, optimize_graph=False, **kwargs):
         """Render the computation of this object's task graph using graphviz.
 
         Requires ``graphviz`` to be installed.
@@ -84,8 +88,13 @@ class DaskMethodsMixin(object):
 
         https://docs.dask.org/en/latest/optimize.html
         """
-        return visualize(self, filename=filename, format=format,
-                         optimize_graph=optimize_graph, **kwargs)
+        return visualize(
+            self,
+            filename=filename,
+            format=format,
+            optimize_graph=optimize_graph,
+            **kwargs
+        )
 
     def persist(self, **kwargs):
         """Persist this dask collection into memory
@@ -188,27 +197,28 @@ def dont_optimize(dsk, keys, **kwargs):
 
 
 def optimization_function(x):
-    return getattr(x, '__dask_optimize__', dont_optimize)
+    return getattr(x, "__dask_optimize__", dont_optimize)
 
 
 def collections_to_dsk(collections, optimize_graph=True, **kwargs):
     """
     Convert many collections into a single dask graph, after optimization
     """
-    optimizations = (kwargs.pop('optimizations', None) or
-                     config.get('optimizations', []))
+    optimizations = kwargs.pop("optimizations", None) or config.get("optimizations", [])
 
     if optimize_graph:
         groups = groupby(optimization_function, collections)
-        groups = {opt: _extract_graph_and_keys(val)
-                  for opt, val in groups.items()}
+        groups = {opt: _extract_graph_and_keys(val) for opt, val in groups.items()}
 
         for opt in optimizations:
-            groups = {k: (opt(dsk, keys), keys)
-                      for k, (dsk, keys) in groups.items()}
+            groups = {k: (opt(dsk, keys), keys) for k, (dsk, keys) in groups.items()}
 
-        dsk = merge(*map(ensure_dict, [opt(dsk, keys, **kwargs)
-                         for opt, (dsk, keys) in groups.items()]))
+        dsk = merge(
+            *map(
+                ensure_dict,
+                [opt(dsk, keys, **kwargs) for opt, (dsk, keys) in groups.items()],
+            )
+        )
     else:
         dsk, _ = _extract_graph_and_keys(collections)
 
@@ -226,7 +236,7 @@ def _extract_graph_and_keys(vals):
     if any(isinstance(graph, HighLevelGraph) for graph in graphs):
         graph = HighLevelGraph.merge(*graphs)
     else:
-        graph = merge(*graphs)
+        graph = merge(*map(ensure_dict, graphs))
 
     return graph, keys
 
@@ -257,7 +267,7 @@ def unpack_collections(*args, **kwargs):
         A function to call on the transformed collections to repackage them as
         they were in the original ``args``.
     """
-    traverse = kwargs.pop('traverse', True)
+    traverse = kwargs.pop("traverse", True)
 
     collections = []
     repack_dsk = {}
@@ -281,12 +291,20 @@ def unpack_collections(*args, **kwargs):
             if typ in (list, tuple, set):
                 tsk = (typ, [_unpack(i) for i in expr])
             elif typ in (dict, OrderedDict):
-                tsk = (typ, [[_unpack(k), _unpack(v)]
-                             for k, v in expr.items()])
+                tsk = (typ, [[_unpack(k), _unpack(v)] for k, v in expr.items()])
             elif is_dataclass(expr):
-                tsk = (apply, typ, (), (dict,
-                       [[f.name, _unpack(getattr(expr, f.name))] for f in
-                        dataclass_fields(expr)]))
+                tsk = (
+                    apply,
+                    typ,
+                    (),
+                    (
+                        dict,
+                        [
+                            [f.name, _unpack(getattr(expr, f.name))]
+                            for f in dataclass_fields(expr)
+                        ],
+                    ),
+                )
             else:
                 return expr
 
@@ -348,8 +366,9 @@ def optimize(*args, **kwargs):
         return args
 
     dsk = collections_to_dsk(collections, **kwargs)
-    postpersists = [a.__dask_postpersist__() if is_dask_collection(a)
-                    else (None, a) for a in args]
+    postpersists = [
+        a.__dask_postpersist__() if is_dask_collection(a) else (None, a) for a in args
+    ]
 
     keys, postpersists = [], []
     for a in collections:
@@ -398,16 +417,18 @@ def compute(*args, **kwargs):
     >>> compute({'a': a, 'b': b, 'c': 1})  # doctest: +SKIP
     ({'a': 45, 'b': 4.5, 'c': 1},)
     """
-    traverse = kwargs.pop('traverse', True)
-    optimize_graph = kwargs.pop('optimize_graph', True)
+    traverse = kwargs.pop("traverse", True)
+    optimize_graph = kwargs.pop("optimize_graph", True)
 
     collections, repack = unpack_collections(*args, traverse=traverse)
     if not collections:
         return args
 
-    schedule = get_scheduler(scheduler=kwargs.pop('scheduler', None),
-                             collections=collections,
-                             get=kwargs.pop('get', None))
+    schedule = get_scheduler(
+        scheduler=kwargs.pop("scheduler", None),
+        collections=collections,
+        get=kwargs.pop("get", None),
+    )
 
     dsk = collections_to_dsk(collections, optimize_graph, **kwargs)
     keys = [x.__dask_keys__() for x in collections]
@@ -464,8 +485,8 @@ def visualize(*args, **kwargs):
     """
     from dask.dot import dot_graph
 
-    filename = kwargs.pop('filename', 'mydask')
-    optimize_graph = kwargs.pop('optimize_graph', False)
+    filename = kwargs.pop("filename", "mydask")
+    optimize_graph = kwargs.pop("optimize_graph", False)
 
     args2 = []
     for arg in args:
@@ -481,25 +502,28 @@ def visualize(*args, **kwargs):
     for d in dsks:
         dsk.update(d)
 
-    color = kwargs.get('color')
+    color = kwargs.get("color")
 
-    if color == 'order':
+    if color == "order":
         from .order import order
         import matplotlib.pyplot as plt
+
         o = order(dsk)
         try:
-            cmap = kwargs.pop('cmap')
+            cmap = kwargs.pop("cmap")
         except KeyError:
             cmap = plt.cm.RdBu
         if isinstance(cmap, str):
             import matplotlib.pyplot as plt
+
             cmap = getattr(plt.cm, cmap)
         mx = max(o.values()) + 1
         colors = {k: _colorize(cmap(v / mx, bytes=True)) for k, v in o.items()}
 
-        kwargs['function_attributes'] = {k: {'color': v, 'label': str(o[k])}
-                                         for k, v in colors.items()}
-        kwargs['data_attributes'] = {k: {'color': v} for k, v in colors.items()}
+        kwargs["function_attributes"] = {
+            k: {"color": v, "label": str(o[k])} for k, v in colors.items()
+        }
+        kwargs["data_attributes"] = {k: {"color": v} for k, v in colors.items()}
     elif color:
         raise NotImplementedError("Unknown value color=%s" % color)
 
@@ -566,15 +590,16 @@ def persist(*args, **kwargs):
     -------
     New dask collections backed by in-memory data
     """
-    traverse = kwargs.pop('traverse', True)
-    optimize_graph = kwargs.pop('optimize_graph', True)
+    traverse = kwargs.pop("traverse", True)
+    optimize_graph = kwargs.pop("optimize_graph", True)
 
     collections, repack = unpack_collections(*args, traverse=traverse)
     if not collections:
         return args
 
-    schedule = get_scheduler(scheduler=kwargs.pop('scheduler', None),
-                             collections=collections)
+    schedule = get_scheduler(
+        scheduler=kwargs.pop("scheduler", None), collections=collections
+    )
 
     if inspect.ismethod(schedule):
         try:
@@ -588,9 +613,9 @@ def persist(*args, **kwargs):
                 pass
             else:
                 if client.get == schedule:
-                    results = client.persist(collections,
-                                             optimize_graph=optimize_graph,
-                                             **kwargs)
+                    results = client.persist(
+                        collections, optimize_graph=optimize_graph, **kwargs
+                    )
                     return repack(results)
 
     dsk = collections_to_dsk(collections, optimize_graph, **kwargs)
@@ -611,6 +636,7 @@ def persist(*args, **kwargs):
 # Tokenize #
 ############
 
+
 def tokenize(*args, **kwargs):
     """ Deterministic token
 
@@ -626,9 +652,9 @@ def tokenize(*args, **kwargs):
 
 
 normalize_token = Dispatch()
-normalize_token.register((int, long, float, str, unicode, bytes, type(None),
-                          type, slice, complex, type(Ellipsis)),
-                         identity)
+normalize_token.register(
+    (int, float, str, bytes, type(None), type, slice, complex, type(Ellipsis)), identity
+)
 
 
 @normalize_token.register(dict)
@@ -653,7 +679,7 @@ def normalize_seq(seq):
 
 @normalize_token.register(object)
 def normalize_object(o):
-    method = getattr(o, '__dask_tokenize__', None)
+    method = getattr(o, "__dask_tokenize__", None)
     if method is not None:
         return method()
     return normalize_function(o) if callable(o) else uuid.uuid4().hex
@@ -683,26 +709,28 @@ def _normalize_function(func):
     if isinstance(func, curry):
         func = func._partial
     if isinstance(func, Compose):
-        first = getattr(func, 'first', None)
+        first = getattr(func, "first", None)
         funcs = reversed((first,) + func.funcs) if first else func.funcs
         return tuple(normalize_function(f) for f in funcs)
     elif isinstance(func, partial):
         args = tuple(normalize_token(i) for i in func.args)
         if func.keywords:
-            kws = tuple((k, normalize_token(v))
-                        for k, v in sorted(func.keywords.items()))
+            kws = tuple(
+                (k, normalize_token(v)) for k, v in sorted(func.keywords.items())
+            )
         else:
             kws = None
         return (normalize_function(func.func), args, kws)
     else:
         try:
             result = pickle.dumps(func, protocol=0)
-            if b'__main__' not in result:  # abort on dynamic functions
+            if b"__main__" not in result:  # abort on dynamic functions
                 return result
         except Exception:
             pass
         try:
             import cloudpickle
+
             return cloudpickle.dumps(func, protocol=0)
         except Exception:
             return str(func)
@@ -718,15 +746,20 @@ def register_pandas():
 
     @normalize_token.register(pd.Categorical)
     def normalize_categorical(cat):
-        return [normalize_token(cat.codes),
-                normalize_token(cat.categories),
-                cat.ordered]
+        return [
+            normalize_token(cat.codes),
+            normalize_token(cat.categories),
+            cat.ordered,
+        ]
 
     @normalize_token.register(pd.Series)
     def normalize_series(s):
-        return [s.name, s.dtype,
-                normalize_token(s._data.blocks[0].values),
-                normalize_token(s.index)]
+        return [
+            s.name,
+            s.dtype,
+            normalize_token(s._data.blocks[0].values),
+            normalize_token(s.index),
+        ]
 
     @normalize_token.register(pd.DataFrame)
     def normalize_dataframe(df):
@@ -742,35 +775,50 @@ def register_numpy():
     @normalize_token.register(np.ndarray)
     def normalize_array(x):
         if not x.shape:
-            return (str(x), x.dtype)
-        if hasattr(x, 'mode') and getattr(x, 'filename', None):
-            if hasattr(x.base, 'ctypes'):
-                offset = (x.ctypes.get_as_parameter().value -
-                          x.base.ctypes.get_as_parameter().value)
+            return (x.item(), x.dtype)
+        if hasattr(x, "mode") and getattr(x, "filename", None):
+            if hasattr(x.base, "ctypes"):
+                offset = (
+                    x.ctypes.get_as_parameter().value
+                    - x.base.ctypes.get_as_parameter().value
+                )
             else:
                 offset = 0  # root memmap's have mmap object as base
-            return (x.filename, os.path.getmtime(x.filename), x.dtype,
-                    x.shape, x.strides, offset)
+            if hasattr(
+                x, "offset"
+            ):  # offset numpy used while opening, and not the offset to the beginning of the file
+                offset += getattr(x, "offset")
+            return (
+                x.filename,
+                os.path.getmtime(x.filename),
+                x.dtype,
+                x.shape,
+                x.strides,
+                offset,
+            )
         if x.dtype.hasobject:
             try:
                 try:
                     # string fast-path
-                    data = hash_buffer_hex('-'.join(x.flat).encode(encoding='utf-8', errors='surrogatepass'))
+                    data = hash_buffer_hex(
+                        "-".join(x.flat).encode(
+                            encoding="utf-8", errors="surrogatepass"
+                        )
+                    )
                 except UnicodeDecodeError:
                     # bytes fast-path
-                    data = hash_buffer_hex(b'-'.join(x.flat))
+                    data = hash_buffer_hex(b"-".join(x.flat))
             except (TypeError, UnicodeDecodeError):
-                # object data w/o fast-path, use fast cPickle
                 try:
-                    data = hash_buffer_hex(cPickle.dumps(x, cPickle.HIGHEST_PROTOCOL))
+                    data = hash_buffer_hex(pickle.dumps(x, pickle.HIGHEST_PROTOCOL))
                 except Exception:
                     # pickling not supported, use UUID4-based fallback
                     data = uuid.uuid4().hex
         else:
             try:
-                data = hash_buffer_hex(x.ravel(order='K').view('i1'))
+                data = hash_buffer_hex(x.ravel(order="K").view("i1"))
             except (BufferError, AttributeError, ValueError):
-                data = hash_buffer_hex(x.copy().ravel(order='K').view('i1'))
+                data = hash_buffer_hex(x.copy().ravel(order="K").view("i1"))
         return (data, x.dtype, x.shape, x.strides)
 
     @normalize_token.register(np.matrix)
@@ -785,7 +833,7 @@ def register_numpy():
         try:
             name = x.__name__
             if getattr(np, name) is x:
-                return 'np.' + name
+                return "np." + name
         except AttributeError:
             return normalize_function(x)
 
@@ -795,18 +843,20 @@ def register_scipy():
     import scipy.sparse as sp
 
     def normalize_sparse_matrix(x, attrs):
-        return type(x).__name__, normalize_seq((normalize_token(getattr(x, key))
-                                                for key in attrs))
+        return (
+            type(x).__name__,
+            normalize_seq((normalize_token(getattr(x, key)) for key in attrs)),
+        )
 
-    for cls, attrs in [(sp.dia_matrix, ('data', 'offsets', 'shape')),
-                       (sp.bsr_matrix, ('data', 'indices', 'indptr',
-                                        'blocksize', 'shape')),
-                       (sp.coo_matrix, ('data', 'row', 'col', 'shape')),
-                       (sp.csr_matrix, ('data', 'indices', 'indptr', 'shape')),
-                       (sp.csc_matrix, ('data', 'indices', 'indptr', 'shape')),
-                       (sp.lil_matrix, ('data', 'rows', 'shape'))]:
-        normalize_token.register(cls,
-                                 partial(normalize_sparse_matrix, attrs=attrs))
+    for cls, attrs in [
+        (sp.dia_matrix, ("data", "offsets", "shape")),
+        (sp.bsr_matrix, ("data", "indices", "indptr", "blocksize", "shape")),
+        (sp.coo_matrix, ("data", "row", "col", "shape")),
+        (sp.csr_matrix, ("data", "indices", "indptr", "shape")),
+        (sp.csc_matrix, ("data", "indices", "indptr", "shape")),
+        (sp.lil_matrix, ("data", "rows", "shape")),
+    ]:
+        normalize_token.register(cls, partial(normalize_sparse_matrix, attrs=attrs))
 
     @normalize_token.register(sp.dok_matrix)
     def normalize_dok_matrix(x):
@@ -828,16 +878,16 @@ def _colorize(t):
     t = t[:3]
     i = sum(v * 256 ** (len(t) - i - 1) for i, v in enumerate(t))
     h = hex(int(i))[2:].upper()
-    h = '0' * (6 - len(h)) + h
+    h = "0" * (6 - len(h)) + h
     return "#" + h
 
 
 named_schedulers = {
-    'sync': local.get_sync,
-    'synchronous': local.get_sync,
-    'single-threaded': local.get_sync,
-    'threads': threaded.get,
-    'threading': threaded.get,
+    "sync": local.get_sync,
+    "synchronous": local.get_sync,
+    "single-threaded": local.get_sync,
+    "threads": threaded.get,
+    "threading": threaded.get,
 }
 
 try:
@@ -845,10 +895,12 @@ try:
 except ImportError:
     pass
 else:
-    named_schedulers.update({
-        'processes': dask_multiprocessing.get,
-        'multiprocessing': dask_multiprocessing.get,
-    })
+    named_schedulers.update(
+        {
+            "processes": dask_multiprocessing.get,
+            "multiprocessing": dask_multiprocessing.get,
+        }
+    )
 
 
 get_err_msg = """
@@ -889,28 +941,31 @@ def get_scheduler(get=None, scheduler=None, collections=None, cls=None):
     if scheduler is not None:
         if callable(scheduler):
             return scheduler
-        elif "Client" in type(scheduler).__name__ and hasattr(scheduler, 'get'):
+        elif "Client" in type(scheduler).__name__ and hasattr(scheduler, "get"):
             return scheduler.get
         elif scheduler.lower() in named_schedulers:
             return named_schedulers[scheduler.lower()]
-        elif scheduler.lower() in ('dask.distributed', 'distributed'):
+        elif scheduler.lower() in ("dask.distributed", "distributed"):
             from distributed.worker import get_client
+
             return get_client().get
-        elif scheduler.lower() in ['processes', 'multiprocessing']:
-            raise ValueError("Please install cloudpickle to use the '%s' scheduler." % scheduler)
         else:
-            raise ValueError("Expected one of [distributed, %s]" % ', '.join(sorted(named_schedulers)))
+            raise ValueError(
+                "Expected one of [distributed, %s]"
+                % ", ".join(sorted(named_schedulers))
+            )
         # else:  # try to connect to remote scheduler with this name
         #     return get_client(scheduler).get
 
-    if config.get('scheduler', None):
-        return get_scheduler(scheduler=config.get('scheduler', None))
+    if config.get("scheduler", None):
+        return get_scheduler(scheduler=config.get("scheduler", None))
 
-    if config.get('get', None):
+    if config.get("get", None):
         raise ValueError(get_err_msg)
 
-    if getattr(thread_state, 'key', False):
+    if getattr(thread_state, "key", False):
         from distributed.worker import get_worker
+
         return get_worker().client.get
 
     if cls is not None:
@@ -921,10 +976,27 @@ def get_scheduler(get=None, scheduler=None, collections=None, cls=None):
     if collections:
         get = collections[0].__dask_scheduler__
         if not all(c.__dask_scheduler__ == get for c in collections):
-            raise ValueError("Compute called on multiple collections with "
-                             "differing default schedulers. Please specify a "
-                             "scheduler=` parameter explicitly in compute or "
-                             "globally with `dask.config.set`.")
+            raise ValueError(
+                "Compute called on multiple collections with "
+                "differing default schedulers. Please specify a "
+                "scheduler=` parameter explicitly in compute or "
+                "globally with `dask.config.set`."
+            )
         return get
 
     return None
+
+
+def wait(x, timeout=None, return_when="ALL_COMPLETED"):
+    """ Wait until computation has finished
+
+    This is a compatibility alias for ``dask.distributed.wait``.
+    If it is applied onto Dask collections without Dask Futures or if Dask
+    distributed is not installed then it is a no-op
+    """
+    try:
+        from distributed import wait
+
+        return wait(x, timeout=timeout, return_when=return_when)
+    except (ImportError, ValueError):
+        return x

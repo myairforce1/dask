@@ -7,15 +7,12 @@ Conda
 -----
 
 Dask is installed by default in `Anaconda <https://www.anaconda.com/download/>`_.
-
 You can update Dask using the `conda <https://www.anaconda.com/download/>`_ command::
 
    conda install dask
 
 This installs Dask and **all** common dependencies, including Pandas and NumPy.
-
 Dask packages are maintained both on the default channel and on `conda-forge <https://conda-forge.github.io/>`_.
-
 Optionally, you can obtain a minimal Dask installation using the following command::
 
    conda install dask-core
@@ -60,20 +57,69 @@ To install Dask from source, clone the repository from `github
 
     git clone https://github.com/dask/dask.git
     cd dask
-    python setup.py install
+    pip install .
 
-or use ``pip`` locally if you want to install all dependencies as well::
+You can also install all dependencies as well::
 
-    pip install -e ".[complete]"
+    pip install ".[complete]"
 
 You can view the list of all dependencies within the ``extras_require`` field
 of ``setup.py``.
+
+
+Or do a developer install by using the ``-e`` flag::
+
+    pip install -e .
 
 Anaconda
 --------
 
 Dask is included by default in the `Anaconda distribution <https://www.anaconda.com/download>`_.
 
+Optional dependencies
+---------------------
+
+Specific functionality in Dask may require additional optional dependencies.
+For example, reading from Amazon S3 requires ``s3fs``.
+These optional dependencies and their minimum supported versions are listed below.
+
++-------------+----------+--------------------------------------------------------------+
+| Dependency  | Version  |                          Description                         |
++=============+==========+==============================================================+
+|    bokeh    | >=1.0.0  |                Visualizing dask diagnostics                  |
++-------------+----------+--------------------------------------------------------------+
+| cloudpickle | >=0.2.1  |              Pickling support for Python objects             |
++-------------+----------+--------------------------------------------------------------+
+|  cityhash   |          |                  Faster hashing of arrays                    |
++-------------+----------+--------------------------------------------------------------+
+| distributed | >=2.0    |               Distributed computing in Python                |
++-------------+----------+--------------------------------------------------------------+
+| fastparquet |          |         Storing and reading data from parquet files          |
++-------------+----------+--------------------------------------------------------------+
+|    fsspec   | >=0.6.0  |          Used for local, cluster and remote data IO          |
++-------------+----------+--------------------------------------------------------------+
+|    gcsfs    | >=0.4.0  |        File-system interface to Google Cloud Storage         |
++-------------+----------+--------------------------------------------------------------+
+|  murmurhash |          |                   Faster hashing of arrays                   |
++-------------+----------+--------------------------------------------------------------+
+|    numpy    | >=1.13.0 |                   Required for dask.array                    |
++-------------+----------+--------------------------------------------------------------+
+|    pandas   | >=0.21.0 |                  Required for dask.dataframe                 |
++-------------+----------+--------------------------------------------------------------+
+|    partd    | >=0.3.10 |            Concurrent appendable key-value storage           |
++-------------+----------+--------------------------------------------------------------+
+|    psutil   |          |             Enables a more accurate CPU count                |
++-------------+----------+--------------------------------------------------------------+
+|    pyarrow  | >=0.14.0 |               Python library for Apache Arrow                |
++-------------+----------+--------------------------------------------------------------+
+|    s3fs     | >=0.4.0  |                    Reading from Amazon S3                    |
++-------------+----------+--------------------------------------------------------------+
+|  sqlalchemy |          |            Writing and reading from SQL databases            |
++-------------+----------+--------------------------------------------------------------+
+|    toolz    | >=0.7.3  | Utility functions for iterators, functions, and dictionaries |
++-------------+----------+--------------------------------------------------------------+
+|   xxhash    |          |                  Faster hashing of arrays                    |
++-------------+----------+--------------------------------------------------------------+
 
 Test
 ----
